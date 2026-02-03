@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.30)
+
+list(APPEND COMMON_SOURCES 
+  ${CMAKE_CURRENT_SOURCE_DIR}/architecture.cpp
+)
+
+set(COMMON_SOURCES ${COMMON_SOURCES} PARENT_SCOPE)
