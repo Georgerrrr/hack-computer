@@ -2,6 +2,7 @@
 #include <vector>
 #include <sstream>
 #include <string>
+#include <functional>
 #include <fstream>
 #include <filesystem>
 #include <unordered_map>
@@ -78,7 +79,7 @@ uint16_t assembleAInstruction(size_t line, const std::string& token) {
   return out;
 }
 
-rom_t assembleLines(const std::vector<std::string>& lines) {
+rom_t assembleLines(const std::vector<std::string>& lines, bool variables) {
   enum {
     notComment,
     lineComment,
@@ -160,11 +161,25 @@ rom_t assembleLines(const std::vector<std::string>& lines) {
       inComment = notComment;
   }
 
+  size_t count = 16;
+
+  const std::vector<std::function<void(const std::pair<std::string, uint16_t>&)>> resolveNames = {
+    [&](const std::pair<std::string, uint16_t>& ur) { 
+      throw ParseError("Unresolved symbol!", ur.second);
+    },
+    [&](const std::pair<std::string, uint16_t>& ur) {
+      out.code[ur.second] = count;
+      count++;
+    }
+  };
+
+
   for (auto& ur : unresolved) {
     if (out.symbols.find(ur.first) == out.symbols.end())
-      throw ParseError("Unresolved symbol!", ur.second);
+      resolveNames[variables](ur);
 
-    out.code[ur.second] = out.symbols[ur.first];
+    else
+      out.code[ur.second] = out.symbols[ur.first];
   }
 
   return out;
@@ -173,14 +188,27 @@ rom_t assembleLines(const std::vector<std::string>& lines) {
 struct Args {
   bool debug = false;
   bool setoutname = false;
+  bool variables = false;
+  bool run = false;
   std::filesystem::path outname;
   std::vector<std::filesystem::path> sources;
 
   void Process(int argc, char** argv) {
+    run = false;
+
+    if (argc == 1) {
+      printf("%s args sources...\nargs:\n\t-d : debug\n\t-o : output filename\n\t-v : enable variables\n", argv[0]);
+      return;
+    }
+
     for (auto i = 1 ; i < argc ; i++) {
       if (std::string(argv[i]) == "-d") 
       {
         debug = true;
+      }
+      else if (std::string(argv[i]) == "-v")
+      {
+        variables = true;
       }
       else if (std::string(argv[i]) == "-o")
       {
@@ -201,6 +229,8 @@ struct Args {
     if (!setoutname) {
       outname = sources[0];
     }
+
+    run = true;
   }
 };
 
@@ -211,13 +241,15 @@ int main(int argc, char** argv) {
 
   args.Process(argc, argv);
 
+  if (!args.run) return 0;
+
   if (args.sources.size() == 0) {
     printf("Must provide at least one source file!\n");
     return 0;
   }
 
   loadFile(args.sources[0], lines);
-  auto rom = assembleLines(lines);
+  auto rom = assembleLines(lines, args.variables);
 
   rom.write(args.outname.replace_extension(".rom"), args.debug);
 }
