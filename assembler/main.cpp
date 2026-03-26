@@ -169,6 +169,7 @@ rom_t assembleLines(const std::vector<std::string>& lines, bool variables) {
     },
     [&](const std::pair<std::string, uint16_t>& ur) {
       out.code[ur.second] = count;
+      out.symbols[ur.first] = count;
       count++;
     }
   };
